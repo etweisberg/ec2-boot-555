@@ -13,7 +13,7 @@ COORDINATOR="$PUB_IP:9000"
 for ((i=1; i<=8; i++)); do
   PORT=$((9000 + i))
   echo "Starting Worker on port $PORT..."
-  java -cp kvs.jar:flame.jar:webserver.jar:log4j_lib/* cis5550.flame.Worker $PORT $COORDINATOR &
+  java -cp kvs.jar:flame.jar:webserver.jar:log4j_lib/*:lucene_lib/* cis5550.flame.Worker $PORT $COORDINATOR &
 done
 
 # Wait for all background processes to finish (optional)
