@@ -138,6 +138,13 @@ def download_from_s3(
 
     # List all objects in the bucket
     all_files = []
+    try:
+        paginator = s3.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=bucket_name):
+            all_files.extend(page.get("Contents", []))
+    except Exception as e:
+        print(f"Failed to list objects in bucket {bucket_name}: {e}")
+        return
 
     # Sort files by key
     all_files.sort(key=lambda obj: obj["Key"])
