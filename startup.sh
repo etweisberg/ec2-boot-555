@@ -23,6 +23,9 @@ pip3 --version
 echo "Creating directory 'w1'..."
 mkdir -p w1
 
+# Load env variables
+source .env
+
 # Install Python dependencies
 pip install -r requirements.txt
 
