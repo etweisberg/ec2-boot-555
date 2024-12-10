@@ -36,6 +36,7 @@ mkdir -p w1
 # Check if the Python script should be run
 if [ "$1" == "yes" ]; then
     echo "Running s3.py script..."
+    pip install -r requirements.txt
     python3 s3.py w1 -d --max_threads 32
 else
     echo "Skipping the execution of the Python script."
