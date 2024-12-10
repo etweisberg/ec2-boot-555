@@ -11,17 +11,18 @@ def upload_file(s3, bucket_name, file_path, s3_key):
     """Helper function to check if a file exists in S3 before uploading."""
     try:
         # Check if the file exists in the bucket
-        try:
-            s3.head_object(Bucket=bucket_name, Key=s3_key)
-            return  # Skip upload if the file exists
-        except s3.exceptions.ClientError as e:
-            if e.response["Error"]["Code"] == "404":
-                # File does not exist, proceed with upload
-                pass
-            else:
-                # Handle other errors
-                print(f"Error checking file in S3: {e}")
-                return
+        if bucket_name != "pt-index":
+            try:
+                s3.head_object(Bucket=bucket_name, Key=s3_key)
+                return  # Skip upload if the file exists
+            except s3.exceptions.ClientError as e:
+                if e.response["Error"]["Code"] == "404":
+                    # File does not exist, proceed with upload
+                    pass
+                else:
+                    # Handle other errors
+                    print(f"Error checking file in S3: {e}")
+                    return
 
         # Upload the file
         s3.upload_file(file_path, bucket_name, s3_key)
@@ -60,7 +61,7 @@ def upload_to_s3(worker_dir, bucket_name, max_threads=8):
             sys.exit(1)
 
     # Directory to upload
-    crawl_dir = os.path.join(worker_dir, "pt-crawl")
+    crawl_dir = os.path.join(worker_dir, bucket_name)
     if not os.path.isdir(crawl_dir):
         print(f"The directory '{crawl_dir}' does not exist.")
         sys.exit(1)
@@ -133,7 +134,7 @@ def download_from_s3(
         sys.exit(1)
 
     # Define the target directory for downloaded data
-    download_dir = os.path.join(worker_dir, "pt-crawl")
+    download_dir = os.path.join(worker_dir, bucket_name)
     os.makedirs(download_dir, exist_ok=True)
 
     # List all objects in the bucket
@@ -209,19 +210,14 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    bucket_name = "pt-crawl"
+    bucket_names = ["pt-counts", "pt-index", "pt-indexed-tracker"]
 
     if args.upload:
-        upload_to_s3(args.worker_directory, bucket_name, args.max_threads)
+        for bucket_name in bucket_names:
+            upload_to_s3(args.worker_directory, bucket_name, args.max_threads)
     elif args.download:
-        download_from_s3(
-            args.worker_directory,
-            bucket_name,
-            args.max_results,
-            args.max_threads,
-            args.start,
-            args.end,
-        )
+        for bucket_name in bucket_names:
+            download_from_s3(args.worker_directory, bucket_name, args.max_results, args.max_threads, args.start, args.end)
     else:
         print("Error: You must specify either --upload or --download.")
         sys.exit(1)
