@@ -15,7 +15,7 @@ def upload_file(s3, bucket_name, file_path, s3_key):
             s3.head_object(Bucket=bucket_name, Key=s3_key)
             return  # Skip upload if the file exists
         except s3.exceptions.ClientError as e:
-            if e.response['Error']['Code'] == "404":
+            if e.response["Error"]["Code"] == "404":
                 # File does not exist, proceed with upload
                 pass
             else:
@@ -30,7 +30,6 @@ def upload_file(s3, bucket_name, file_path, s3_key):
         print(f"Failed to upload {file_path} to s3://{bucket_name}/{s3_key}: {e}")
 
 
-
 def upload_to_s3(worker_dir, bucket_name, max_threads=8):
     # Load environment variables from .env
     # load_dotenv()
@@ -43,7 +42,7 @@ def upload_to_s3(worker_dir, bucket_name, max_threads=8):
 
     # Initialize S3 client
     s3 = boto3.client(
-        's3',
+        "s3",
         aws_access_key_id=aws_access_key,
         aws_secret_access_key=aws_secret_key,
     )
@@ -53,7 +52,7 @@ def upload_to_s3(worker_dir, bucket_name, max_threads=8):
         s3.head_bucket(Bucket=bucket_name)
         print(f"Bucket '{bucket_name}' already exists.")
     except botocore.exceptions.ClientError as e:
-        if e.response['Error']['Code'] == '404':
+        if e.response["Error"]["Code"] == "404":
             print(f"Bucket '{bucket_name}' does not exist. Creating it...")
             s3.create_bucket(Bucket=bucket_name)
         else:
@@ -71,7 +70,9 @@ def upload_to_s3(worker_dir, bucket_name, max_threads=8):
     for root, dirs, files in os.walk(crawl_dir):
         for file in files:
             file_path = os.path.join(root, file)
-            s3_key = os.path.relpath(file_path, crawl_dir)  # Relative path within S3 bucket
+            s3_key = os.path.relpath(
+                file_path, crawl_dir
+            )  # Relative path within S3 bucket
             files_to_upload.append((file_path, s3_key))
 
     print(f"Found {len(files_to_upload)} files to upload.")
@@ -80,7 +81,9 @@ def upload_to_s3(worker_dir, bucket_name, max_threads=8):
     with ThreadPoolExecutor(max_threads) as executor:
         futures = []
         for file_path, s3_key in files_to_upload:
-            futures.append(executor.submit(upload_file, s3, bucket_name, file_path, s3_key))
+            futures.append(
+                executor.submit(upload_file, s3, bucket_name, file_path, s3_key)
+            )
 
         print("Uploading batch of " + str(len(futures)) + " files...")
         for future in as_completed(futures):
@@ -102,7 +105,9 @@ def download_file(s3, bucket_name, s3_key, target_path):
         print(f"Failed to download s3://{bucket_name}/{s3_key}: {e}")
 
 
-def download_from_s3(worker_dir, bucket_name, max_results=None, max_threads=8):
+def download_from_s3(
+    worker_dir, bucket_name, max_results=None, max_threads=8, start=None, end=None
+):
     # Load environment variables from .env
     # load_dotenv()
     aws_access_key = os.getenv("AWS_ACCESS_KEY")
@@ -114,7 +119,7 @@ def download_from_s3(worker_dir, bucket_name, max_results=None, max_threads=8):
 
     # Initialize S3 client
     s3 = boto3.client(
-        's3',
+        "s3",
         aws_access_key_id=aws_access_key,
         aws_secret_access_key=aws_secret_key,
     )
@@ -133,47 +138,67 @@ def download_from_s3(worker_dir, bucket_name, max_results=None, max_threads=8):
 
     # List all objects in the bucket
     all_files = []
-    try:
-        paginator = s3.get_paginator("list_objects_v2")
-        for page in paginator.paginate(Bucket=bucket_name):
-            if "Contents" in page:
-                for obj in page["Contents"]:
-                    all_files.append(obj["Key"])
-                    if max_results and len(all_files) >= max_results:
-                        print(f"Reached the max limit of {max_results} results.")
-                        break
-            if max_results and len(all_files) >= max_results:
-                break
-    except Exception as e:
-        print(f"Failed to list objects in bucket: {e}")
-        sys.exit(1)
 
-    print(f"Found {len(all_files)} files to download.")
+    # Sort files by key
+    all_files.sort(key=lambda obj: obj["Key"])
+
+    # Apply start and end range
+    if start is not None and end is not None:
+        all_files = all_files[start - 1 : end]
 
     # Download files using multithreading
-    with ThreadPoolExecutor(max_threads) as executor:
-        futures = []
-        for s3_key in all_files:
-            target_path = os.path.join(download_dir, s3_key)
-            futures.append(executor.submit(download_file, s3, bucket_name, s3_key, target_path))
+    def download_file(obj):
+        s3_key = obj["Key"]
+        file_path = os.path.join(download_dir, os.path.basename(s3_key))
+        try:
+            s3.download_file(bucket_name, s3_key, file_path)
+            print(f"Downloaded {s3_key} to {file_path}")
+        except Exception as e:
+            print(f"Failed to download s3://{bucket_name}/{s3_key}: {e}")
 
-        print("Downloading batch of " + str(len(futures)) + " results...")
+    with ThreadPoolExecutor(max_threads) as executor:
+        futures = [executor.submit(download_file, obj) for obj in all_files]
         for future in as_completed(futures):
-            try:
-                future.result()
-            except Exception as e:
-                print(f"Error during file download: {e}")
+            future.result()
 
     print("All downloads completed.")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Upload or download files to/from S3.")
-    parser.add_argument("-d", "--download", action="store_true", help="Download files from S3.")
-    parser.add_argument("-u", "--upload", action="store_true", help="Upload files to S3.")
-    parser.add_argument("worker_directory", type=str, help="Path to the worker directory.")
-    parser.add_argument("--max_results", type=int, default=None, help="Max results to download (optional).")
-    parser.add_argument("--max_threads", type=int, default=8, help="Number of threads for upload/download (optional).")
+    parser.add_argument(
+        "-d", "--download", action="store_true", help="Download files from S3."
+    )
+    parser.add_argument(
+        "-u", "--upload", action="store_true", help="Upload files to S3."
+    )
+    parser.add_argument(
+        "worker_directory", type=str, help="Path to the worker directory."
+    )
+    parser.add_argument(
+        "--max_results",
+        type=int,
+        default=None,
+        help="Max results to download (optional).",
+    )
+    parser.add_argument(
+        "--max_threads",
+        type=int,
+        default=8,
+        help="Number of threads for upload/download (optional).",
+    )
+    parser.add_argument(
+        "--start",
+        type=int,
+        default=None,
+        help="Number of threads for upload/download (optional).",
+    )
+    parser.add_argument(
+        "--end",
+        type=int,
+        default=None,
+        help="Number of threads for upload/download (optional).",
+    )
 
     args = parser.parse_args()
 
@@ -182,7 +207,14 @@ if __name__ == "__main__":
     if args.upload:
         upload_to_s3(args.worker_directory, bucket_name, args.max_threads)
     elif args.download:
-        download_from_s3(args.worker_directory, bucket_name, args.max_results, args.max_threads)
+        download_from_s3(
+            args.worker_directory,
+            bucket_name,
+            args.max_results,
+            args.max_threads,
+            args.start,
+            args.end,
+        )
     else:
         print("Error: You must specify either --upload or --download.")
         sys.exit(1)
