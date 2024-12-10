@@ -23,6 +23,9 @@ pip3 --version
 echo "Creating directory 'w1'..."
 mkdir -p w1
 
+# Install Python dependencies
+pip install -r requirements.txt
+
 # Run the Python script
 echo "Running s3.py script..."
 python3 s3.py w1 -d --max_threads 32
