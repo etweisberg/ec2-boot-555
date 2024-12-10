@@ -10,4 +10,4 @@ fi
 IP=$1
 
 # Run the Java command with the provided IP address
-java -Xms24g -Xmx24g -cp kvs.jar:flame.jar:webserver.jar:log4j_lib/*:lucene_lib/* cis5550.flame.Coordinator 9000 $IP:8000
+java -Xms24g -Xmx24g -cp kvs.jar:flame.jar:webserver.jar:log4j_lib/*:lucene_lib/*:tika_lib/* cis5550.flame.Coordinator 9000 $IP:8000
