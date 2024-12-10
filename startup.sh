@@ -1,5 +1,15 @@
 #!/bin/bash
 
+# Check if an argument is provided
+if [ "$#" -ne 1 ]; then
+    echo "Usage: $0 <run_python>"
+    echo "<run_python> should be 'yes' to run the Python script or 'no' to skip it."
+    exit 1
+fi
+
+# Load env
+source .env
+
 # Update the system
 sudo yum update -y
 
@@ -23,15 +33,13 @@ pip3 --version
 echo "Creating directory 'w1'..."
 mkdir -p w1
 
-# Load env variables
-source .env
-
-# Install Python dependencies
-pip install -r requirements.txt
-
-# Run the Python script
-echo "Running s3.py script..."
-python3 s3.py w1 -d --max_threads 32
+# Check if the Python script should be run
+if [ "$1" == "yes" ]; then
+    echo "Running s3.py script..."
+    python3 s3.py w1 -d --max_threads 32
+else
+    echo "Skipping the execution of the Python script."
+fi
 
 echo "Script execution completed."
 
